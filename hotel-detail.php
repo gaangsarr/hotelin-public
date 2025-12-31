@@ -70,21 +70,54 @@ include 'includes/navbar.php';
                 <p class="text-muted"><?php echo nl2br($hotel['deskripsi']); ?></p>
             </div>
             
-            <?php if (!empty($hotel['fasilitas'])): ?>
-                <div class="mb-4">
-                    <h5>Fasilitas Hotel</h5>
-                    <div>
-                        <?php 
-                        $fasilitas = parseFasilitas($hotel['fasilitas']);
-                        foreach ($fasilitas as $f): 
-                        ?>
-                            <span class="facilities-badge">
-                                <i class="bi bi-check-circle-fill text-success"></i> <?php echo $f; ?>
-                            </span>
-                        <?php endforeach; ?>
-                    </div>
+            <!-- Facilities Section -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-check2-square"></i> Fasilitas Hotel</h5>
                 </div>
-            <?php endif; ?>
+                <div class="card-body">
+                    <?php 
+                    $fasilitas = getHotelFasilitas($hotel['id_hotel']);
+                    
+                    if (!empty($fasilitas)) {
+                        // Group by kategori
+                        $grouped = [];
+                        foreach ($fasilitas as $f) {
+                            $grouped[$f['kategori']][] = $f;
+                        }
+                        
+                        foreach ($grouped as $kategori => $items):
+                    ?>
+                        <div class="mb-4">
+                            <h6 class="text-<?php 
+                                echo $kategori == 'Essential' ? 'primary' : 
+                                    ($kategori == 'Premium' ? 'success' : 'warning'); 
+                            ?> mb-3">
+                                <i class="bi bi-star-fill"></i> <?php echo $kategori; ?> Facilities
+                            </h6>
+                            <div class="row">
+                                <?php foreach ($items as $f): ?>
+                                    <div class="col-md-4 col-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <i class="<?php echo $f['icon']; ?> text-success me-2" style="font-size: 1.2rem;"></i>
+                                            <span><?php echo $f['nama_fasilitas']; ?></span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php 
+                        endforeach;
+                    } else {
+                        echo '<div class="text-center py-4">';
+                        echo '<i class="bi bi-x-circle text-muted" style="font-size: 3rem;"></i>';
+                        echo '<p class="text-muted mt-2">Tidak ada informasi fasilitas.</p>';
+                        echo '</div>';
+                    }
+                    ?>
+                </div>
+            </div>
+
             
             <div class="border-top pt-3">
                 <h6>Kontak</h6>

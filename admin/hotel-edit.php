@@ -21,9 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = cleanInput($_POST['phone']);
     $email = cleanInput($_POST['email']);
     
-    // Fasilitas as JSON
-    $fasilitas = isset($_POST['fasilitas']) ? $_POST['fasilitas'] : [];
-    $fasilitas_json = json_encode($fasilitas);
+    // Get fasilitas IDs from checkbox
+    $fasilitas_ids = isset($_POST['fasilitas']) ? array_map('intval', $_POST['fasilitas']) : [];
     
     // Handle photo upload
     $foto_path = $hotel['foto_hotel'];
@@ -40,17 +39,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     
     if (empty($error)) {
+        // Update hotel (no fasilitas column)
         $sql = "UPDATE hotel SET nama_hotel = ?, alamat_lengkap = ?, id_kota = ?, 
-                deskripsi = ?, rating = ?, foto_hotel = ?, phone = ?, email = ?, fasilitas = ?
+                deskripsi = ?, rating = ?, foto_hotel = ?, phone = ?, email = ?
                 WHERE id_hotel = ?";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param("ssissssssi", $nama_hotel, $alamat, $id_kota, $deskripsi, $rating, 
-                          $foto_path, $phone, $email, $fasilitas_json, $hotel_id);
+        $stmt->bind_param("ssisssssi", $nama_hotel, $alamat, $id_kota, $deskripsi, $rating, 
+                          $foto_path, $phone, $email, $hotel_id);
         
         if ($stmt->execute()) {
-            $_SESSION['success_message'] = 'Hotel profile berhasil diupdate!';
-            header('Location: ' . adminURL('hotel-edit.php', $hotel_id));
-            exit();
+            // Update fasilitas in separate table
+            if (updateHotelFasilitas($hotel_id, $fasilitas_ids)) {
+                $_SESSION['success_message'] = 'Hotel profile berhasil diupdate!';
+                header('Location: ' . adminURL('hotel-edit.php', $hotel_id));
+                exit();
+            } else {
+                $error = 'Hotel updated, tapi gagal update fasilitas!';
+            }
         } else {
             $error = 'Update gagal! ' . $stmt->error;
         }
@@ -60,16 +65,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get all cities
 $cities = $conn->query("SELECT k.*, p.nama_provinsi FROM kota k JOIN provinsi p ON k.id_provinsi = p.id_provinsi ORDER BY k.nama_kota");
 
-// Predefined facilities
-$all_fasilitas = [
-    'WiFi Gratis', 'Kolam Renang', 'Gym', 'Restoran', 'Room Service 24 Jam',
-    'Spa & Wellness', 'Parkir Gratis', 'AC', 'TV Kabel', 'Laundry',
-    'Meeting Room', 'Airport Shuttle', 'Bar', 'Kids Club', 'Beach Access',
-    'Infinity Pool', 'Ocean View', 'BBQ Facilities', 'Butler Service', 'Yoga Session',
-    'Surfing Lesson', 'Beach Club Access', 'Private Chef Service'
-];
+// Get all available fasilitas
+$all_fasilitas = getAllFasilitas();
 
-$selected_fasilitas = parseFasilitas($hotel['fasilitas']);
+// Get selected fasilitas IDs for this hotel
+$selected_fasilitas_ids = getHotelFasilitasIds($hotel_id);
 
 $page_title = 'Edit Hotel Profile';
 include '../includes/header.php';
@@ -205,18 +205,43 @@ include '../includes/navbar.php';
             <div class="col-md-4">
                 <div class="card shadow-sm sticky-top" style="top: 20px;">
                     <div class="card-header bg-light">
-                        <h6 class="mb-0"><i class="bi bi-check2-square"></i> Fasilitas Hotel</h6>
+                        <h6 class="mb-0">
+                            <i class="bi bi-check2-square"></i> Fasilitas Hotel
+                            <span class="badge bg-primary ms-2" id="selected-count"><?php echo count($selected_fasilitas_ids); ?></span>
+                        </h6>
                     </div>
                     <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                        <small class="text-muted mb-2 d-block">Pilih fasilitas yang tersedia:</small>
-                        <?php foreach ($all_fasilitas as $f): ?>
-                            <div class="form-check mb-2">
-                                <input class="form-check-input" type="checkbox" name="fasilitas[]" 
-                                       value="<?php echo $f; ?>" id="fas_<?php echo md5($f); ?>"
-                                       <?php echo in_array($f, $selected_fasilitas) ? 'checked' : ''; ?>>
-                                <label class="form-check-label" for="fas_<?php echo md5($f); ?>">
-                                    <?php echo $f; ?>
-                                </label>
+                        <small class="text-muted mb-3 d-block">Pilih fasilitas yang tersedia di hotel Anda:</small>
+                        
+                        <?php 
+                        // Group by kategori
+                        $grouped = [];
+                        foreach ($all_fasilitas as $f) {
+                            $grouped[$f['kategori']][] = $f;
+                        }
+                        
+                        foreach ($grouped as $kategori => $items): 
+                        ?>
+                            <div class="mb-3">
+                                <h6 class="text-<?php 
+                                    echo $kategori == 'Essential' ? 'primary' : 
+                                         ($kategori == 'Premium' ? 'success' : 'warning'); 
+                                ?>">
+                                    <?php echo $kategori; ?> Facilities
+                                </h6>
+                                <?php foreach ($items as $f): ?>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input fasilitas-checkbox" 
+                                               type="checkbox" 
+                                               name="fasilitas[]" 
+                                               value="<?php echo $f['id_fasilitas']; ?>" 
+                                               id="fas_<?php echo $f['id_fasilitas']; ?>"
+                                               <?php echo in_array($f['id_fasilitas'], $selected_fasilitas_ids) ? 'checked' : ''; ?>>
+                                        <label class="form-check-label" for="fas_<?php echo $f['id_fasilitas']; ?>">
+                                            <i class="<?php echo $f['icon']; ?>"></i> <?php echo $f['nama_fasilitas']; ?>
+                                        </label>
+                                    </div>
+                                <?php endforeach; ?>
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -233,6 +258,18 @@ include '../includes/navbar.php';
         </div>
     </form>
 </div>
+
+<script>
+// Update counter when checkbox changed
+document.querySelectorAll('.fasilitas-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', updateCount);
+});
+
+function updateCount() {
+    const count = document.querySelectorAll('.fasilitas-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = count;
+}
+</script>
 
 <?php 
 $conn->close();

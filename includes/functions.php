@@ -188,13 +188,6 @@ function deleteFile($filePath) {
     return false;
 }
 
-// Parse JSON fasilitas
-function parseFasilitas($json) {
-    if (empty($json)) return [];
-    $data = json_decode($json, true);
-    return is_array($data) ? $data : [];
-}
-
 // Check room availability
 function isRoomAvailable($kamar_id, $checkin, $checkout, $exclude_booking_id = null) {
     $conn = getConnection();
@@ -237,4 +230,157 @@ function getUserInfo($user_id) {
     $conn->close();
     return $result;
 }
+
+// ========================================
+// FASILITAS FUNCTIONS (Normalized Version)
+// ========================================
+
+/**
+ * Get all available facilities from master table
+ * @return array List of all facilities
+ */
+function getAllFasilitas() {
+    $conn = getConnection();
+    $result = $conn->query("
+        SELECT * FROM fasilitas 
+        ORDER BY 
+            CASE kategori
+                WHEN 'Essential' THEN 1
+                WHEN 'Premium' THEN 2
+                WHEN 'Luxury' THEN 3
+            END,
+            nama_fasilitas
+    ");
+    
+    $fasilitas = [];
+    while ($row = $result->fetch_assoc()) {
+        $fasilitas[] = $row;
+    }
+    $conn->close();
+    return $fasilitas;
+}
+
+/**
+ * Get facilities for specific hotel
+ * @param int $hotel_id Hotel ID
+ * @return array List of facilities with details
+ */
+function getHotelFasilitas($hotel_id) {
+    $conn = getConnection();
+    $stmt = $conn->prepare("
+        SELECT f.id_fasilitas, f.nama_fasilitas, f.icon, f.kategori
+        FROM fasilitas f
+        JOIN hotel_fasilitas hf ON f.id_fasilitas = hf.id_fasilitas
+        WHERE hf.id_hotel = ?
+        ORDER BY 
+            CASE f.kategori
+                WHEN 'Essential' THEN 1
+                WHEN 'Premium' THEN 2
+                WHEN 'Luxury' THEN 3
+            END,
+            f.nama_fasilitas
+    ");
+    $stmt->bind_param("i", $hotel_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $fasilitas = [];
+    while ($row = $result->fetch_assoc()) {
+        $fasilitas[] = $row;
+    }
+    
+    $stmt->close();
+    $conn->close();
+    return $fasilitas;
+}
+
+/**
+ * Get facility IDs for hotel (for form checkbox pre-selection)
+ * @param int $hotel_id Hotel ID
+ * @return array Array of facility IDs
+ */
+function getHotelFasilitasIds($hotel_id) {
+    $conn = getConnection();
+    $stmt = $conn->prepare("
+        SELECT id_fasilitas FROM hotel_fasilitas WHERE id_hotel = ?
+    ");
+    $stmt->bind_param("i", $hotel_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $ids = [];
+    while ($row = $result->fetch_assoc()) {
+        $ids[] = $row['id_fasilitas'];
+    }
+    
+    $stmt->close();
+    $conn->close();
+    return $ids;
+}
+
+/**
+ * Update hotel facilities (delete old, insert new)
+ * @param int $hotel_id Hotel ID
+ * @param array $fasilitas_ids Array of facility IDs
+ * @return bool Success status
+ */
+function updateHotelFasilitas($hotel_id, $fasilitas_ids) {
+    $conn = getConnection();
+    
+    // Start transaction
+    $conn->begin_transaction();
+    
+    try {
+        // Delete existing facilities
+        $stmt = $conn->prepare("DELETE FROM hotel_fasilitas WHERE id_hotel = ?");
+        $stmt->bind_param("i", $hotel_id);
+        $stmt->execute();
+        
+        // Insert new facilities
+        if (!empty($fasilitas_ids)) {
+            $stmt = $conn->prepare("INSERT INTO hotel_fasilitas (id_hotel, id_fasilitas) VALUES (?, ?)");
+            foreach ($fasilitas_ids as $id_fasilitas) {
+                $stmt->bind_param("ii", $hotel_id, $id_fasilitas);
+                $stmt->execute();
+            }
+        }
+        
+        $conn->commit();
+        $stmt->close();
+        $conn->close();
+        return true;
+    } catch (Exception $e) {
+        $conn->rollback();
+        $conn->close();
+        return false;
+    }
+}
+
+/**
+ * Display facility badges (HTML output)
+ * @param int $hotel_id Hotel ID
+ */
+function displayFasilitasBadges($hotel_id) {
+    $fasilitas = getHotelFasilitas($hotel_id);
+    
+    if (empty($fasilitas)) {
+        echo '<span class="text-muted small"><i class="bi bi-x-circle"></i> Tidak ada fasilitas</span>';
+        return;
+    }
+    
+    foreach ($fasilitas as $f) {
+        $badge_class = match($f['kategori']) {
+            'Essential' => 'bg-primary',
+            'Premium' => 'bg-success',
+            'Luxury' => 'bg-warning text-dark',
+            default => 'bg-secondary'
+        };
+        
+        echo '<span class="badge ' . $badge_class . ' me-1 mb-1">';
+        echo '<i class="' . htmlspecialchars($f['icon']) . '"></i> ';
+        echo htmlspecialchars($f['nama_fasilitas']);
+        echo '</span> ';
+    }
+}
+
 ?>

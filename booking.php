@@ -149,6 +149,15 @@ include 'includes/navbar.php';
                     <p class="small mb-3">
                         <i class="bi bi-people"></i> Kapasitas: <?php echo $room['kapasitas']; ?> orang
                     </p>
+
+                    <!-- Facilities Display in Booking Summary -->
+                    <div class="mb-3">
+                        <strong><i class="bi bi-check2-square"></i> Fasilitas Hotel:</strong><br>
+                        <div class="mt-2">
+                            <?php displayFasilitasBadges($room['id_hotel']); ?>
+                        </div>
+                    </div>
+
                     
                     <hr>
                     

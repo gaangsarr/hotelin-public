@@ -112,6 +112,31 @@ include '../includes/navbar.php';
                                     <i class="bi bi-calendar-check"></i> <?php echo $bookings_count; ?> Bookings
                                 </small>
                             </div>
+
+                            <!-- Di dalam card hotel -->
+                            <div class="card-text mb-2">
+                                <strong><i class="bi bi-check2-square"></i> Fasilitas:</strong><br>
+                                <?php 
+                                $fasilitas = getHotelFasilitas($hotel['id_hotel']);
+                                if (!empty($fasilitas)) {
+                                    $count = 0;
+                                    $max_show = 5;
+                                    foreach ($fasilitas as $f) {
+                                        if ($count >= $max_show) {
+                                            $remaining = count($fasilitas) - $max_show;
+                                            echo '<span class="badge bg-secondary">+' . $remaining . ' more</span>';
+                                            break;
+                                        }
+                                        echo '<span class="badge bg-light text-dark me-1 mb-1">';
+                                        echo '<i class="' . $f['icon'] . '"></i> ' . $f['nama_fasilitas'];
+                                        echo '</span> ';
+                                        $count++;
+                                    }
+                                } else {
+                                    echo '<span class="text-muted small">Tidak ada fasilitas</span>';
+                                }
+                                ?>
+                            </div>
                             
                             <a href="dashboard.php?hotel_id=<?php echo $hotel['id_hotel']; ?>" 
                                class="btn btn-primary w-100">

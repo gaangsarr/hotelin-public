@@ -145,11 +145,11 @@ include 'includes/navbar.php';
                         <div class="alert alert-info">
                             <strong>Bank Transfer:</strong><br>
                             Bank BCA - 1234567890<br>
-                            A/N HotelBooking Indonesia<br><br>
+                            A/N HotelIn Indonesia<br><br>
                             
                             <strong>E-Wallet:</strong><br>
                             OVO/GoPay: 081234567890<br>
-                            A/N HotelBooking
+                            A/N HotelIn
                         </div>
                         
                         <form method="POST" action="" enctype="multipart/form-data">

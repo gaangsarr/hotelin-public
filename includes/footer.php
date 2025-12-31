@@ -2,7 +2,7 @@
     <div class="container">
         <div class="row">
             <div class="col-md-6">
-                <h5><i class="bi bi-building"></i> HotelBooking</h5>
+                <h5><i class="bi bi-building"></i> HotelIn</h5>
                 <p class="text-muted">Platform booking hotel terpercaya di Indonesia.</p>
             </div>
             <div class="col-md-3">
@@ -22,7 +22,7 @@
         </div>
         <hr>
         <div class="text-center">
-            <small class="text-muted">&copy; <?php echo date('Y'); ?> HotelBooking. All rights reserved.</small>
+            <small class="text-muted">&copy; <?php echo date('Y'); ?> HotelIn. All rights reserved.</small>
         </div>
     </div>
 </footer>
